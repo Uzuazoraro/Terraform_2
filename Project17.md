@@ -29,3 +29,12 @@ Note that the route determines the path or flow of traffic.
 Run "terraform apply --auto-approve" to apply what you've created.
 
 
+# Create AWS Certificate
+ Name it "cert.tf"
+
+# Create Application Load Balancer
+Name it "alb.tf"
+Always create the alb.tf before you create the security group. This is because the security group is going to reference the alb.tf.
+
+# Create security groups
+Name it "security.tf"
