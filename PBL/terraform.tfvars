@@ -16,6 +16,11 @@ preferred_number_of_private_subnets = 4
 
 environment = "dev"
 
+ami = "ami-0574da719dca65348"
+
+keypair = "Micolo"
+
+
 tags = {
   Owner-Email     = "micaho2000@gmail.com"
   Managed-by      = "Terraform"
