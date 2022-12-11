@@ -20,6 +20,11 @@ ami = "ami-0574da719dca65348"
 
 keypair = "Micolo"
 
+account_no = "945397719425"
+
+master-username = "uzuazoraro"
+
+master-password = "devopstraining"
 
 tags = {
   Owner-Email     = "micaho2000@gmail.com"

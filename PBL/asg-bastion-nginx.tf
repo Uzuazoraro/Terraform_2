@@ -150,5 +150,5 @@ resource "aws_autoscaling_group" "nginx-asg" {
 # you need the target group to attach a load balancer to a resources
 resource "aws_autoscaling_attachment" "asg_attachment_nginx" {
   autoscaling_group_name = aws_autoscaling_group.nginx-asg.id
-  lb_target_group_arn   = aws_lb_target_group.nginx-tgt.arn
+  lb_target_group_arn    = aws_lb_target_group.nginx-tgt.arn
 }
