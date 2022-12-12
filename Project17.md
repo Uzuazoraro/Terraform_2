@@ -1,18 +1,98 @@
+# AUTOMATE INFRASTRUCTURE WITH IAC USING TERRAFORM. PART 2
 
+Note: You can add multiple tags as a default set. for example, in out terraform.tfvars file we can have default tags defined.
 
-![subnets creation](./public & private subnets being created.png)
+tags = {
+  Enviroment      = "production" 
+  Owner-Email     = "dare@darey.io"
+  Managed-By      = "Terraform"
+  Billing-Account = "1234567890"
+}
+Now you can tag all you resources using the format below
 
-# Tag your resources
+tags = merge(
+    var.tags,
+    {
+      Name = "Name of the resource"
+    },
+  )
+NOTE: Update the variables.tf to declare the variable tags used in the format above;
+
+variable "tags" {
+  description = "A mapping of tags to assign to all resources."
+  type        = map(string)
+  default     = {}
+}
 
 ![tagging introduced](./tagging of resources.png)
 
-# Create Natgateway
+# Internet Gateways & format() function
+Create an Internet Gateway in a separate Terraform file internet_gateway.tf
 
-Note that natgateway depends on the elastic IP. Also, natgateway and elastic IP depends on internet gateway. Hence, "internet gateway" should be created before elastic IP and natgateway.
+resource "aws_internet_gateway" "ig" {
+  vpc_id = aws_vpc.main.id
 
-Also, do not fail to declare all variables in the variables.tf and declare the values in terraform.tfvars.
+  tags = merge(
+    var.tags,
+    {
+      Name = format("%s-%s!", aws_vpc.main.id,"IG")
+    } 
+  )
+}
+Did you notice how we have used format() function to dynamically generate a unique name for this resource? The first part of the %s takes the interpolated value of aws_vpc.main.id while the second %s appends a literal string IG and finally an exclamation mark is added in the end.
+
+If any of the resources being created is either using the count function, or creating multiple resources using a loop, then a key-value pair that needs to be unique must be handled differently.
+
+For example, each of our subnets should have a unique name in the tag section. Without the format() function, we would not be able to see uniqueness. With the format function, each private subnet’s tag will look like this.
+
+Name = PrvateSubnet-0
+Name = PrvateSubnet-1
+Name = PrvateSubnet-2
+Lets try and see that in action.
+
+  tags = merge(
+    var.tags,
+    {
+      Name = format("PrivateSubnet-%s", count.index)
+    } 
+  )
+NAT Gateways
+Create 1 NAT Gateways and 1 Elastic IP (EIP) addresses
+
+Now use similar approach to create the NAT Gateways in a new file called natgateway.tf.
+
+Note: We need to create an Elastic IP for the NAT Gateway, and you can see the use of depends_on to indicate that the Internet Gateway resource must be available before this should be created. Although Terraform does a good job to manage dependencies, but in some cases, it is good to be explicit.
+
+You can read more on dependencies here
+
+resource "aws_eip" "nat_eip" {
+  vpc        = true
+  depends_on = [aws_internet_gateway.ig]
+
+  tags = merge(
+    var.tags,
+    {
+      Name = format("%s-EIP", var.name)
+    },
+  )
+}
+
+resource "aws_nat_gateway" "nat" {
+  allocation_id = aws_eip.nat_eip.id
+  subnet_id     = element(aws_subnet.public.*.id, 0)
+  depends_on    = [aws_internet_gateway.ig]
+
+  tags = merge(
+    var.tags,
+    {
+      Name = format("%s-Nat", var.name)
+    },
+  )
+}
 
 ![creation of other resources](./creation of int-gw, nat-gw & EIP.png)
+![subnets creation](./public & private subnets being created.png]
+![tagging introduced](./tagging of resources.png)
 
 
 ## Install graphviz sudo apt install graphviz
@@ -23,6 +103,52 @@ Also, do not fail to declare all variables in the variables.tf and declare the v
 
 # Create route tables and routes.
 Note that the route determines the path or flow of traffic.
+
+# create private route table
+resource "aws_route_table" "private-rtb" {
+  vpc_id = aws_vpc.main.id
+
+  tags = merge(
+    var.tags,
+    {
+      Name = format("%s-Private-Route-Table", var.name)
+    },
+  )
+}
+
+# associate all private subnets to the private route table
+resource "aws_route_table_association" "private-subnets-assoc" {
+  count          = length(aws_subnet.private[*].id)
+  subnet_id      = element(aws_subnet.private[*].id, count.index)
+  route_table_id = aws_route_table.private-rtb.id
+}
+
+# create route table for the public subnets
+resource "aws_route_table" "public-rtb" {
+  vpc_id = aws_vpc.main.id
+
+  tags = merge(
+    var.tags,
+    {
+      Name = format("%s-Public-Route-Table", var.name)
+    },
+  )
+}
+
+# create route for the public route table and attach the internet gateway
+resource "aws_route" "public-rtb-route" {
+  route_table_id         = aws_route_table.public-rtb.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = aws_internet_gateway.ig.id
+}
+
+# associate all public subnets to the public route table
+resource "aws_route_table_association" "public-subnets-assoc" {
+  count          = length(aws_subnet.public[*].id)
+  subnet_id      = element(aws_subnet.public[*].id, count.index)
+  route_table_id = aws_route_table.public-rtb.id
+}
+
 
 ![route tables created](./creation of public & private route tables.png)
 
